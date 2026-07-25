@@ -189,6 +189,30 @@ class ApiService {
     }
   }
 
+  /// Muzzomo AI chat is open to unauthenticated use — no Django JWT required.
+  static Future<Map<String, dynamic>?> askMuzzomoAi({
+    required String question,
+    int? conversationId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$djangoBaseUrl/muzzomo-ai/ask/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'question': question,
+          'conversation_id': conversationId,
+        }),
+      );
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      print('Failed to get Muzzomo AI answer: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      print('Error asking Muzzomo AI: $e');
+    }
+    return null;
+  }
+
   static Future<void> sendChatNotification({
     required String roomId,
     required String messageText,

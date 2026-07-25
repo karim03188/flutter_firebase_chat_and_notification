@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import 'chat_screen.dart';
+import 'muzzomo_ai_chat_screen.dart';
 
 class RoomsScreen extends StatefulWidget {
   const RoomsScreen({super.key});
@@ -61,6 +62,13 @@ class _RoomsScreenState extends State<RoomsScreen> {
         ),
       ),
     ).then((_) => _loadRooms());
+  }
+
+  void _openMuzzomoAiChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MuzzomoAiChatScreen()),
+    );
   }
 
   Future<void> _signOut() async {
@@ -366,6 +374,77 @@ class _RoomsScreenState extends State<RoomsScreen> {
                 tooltip: 'Sign out',
               ),
             ],
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                elevation: 0,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _openMuzzomoAiChat,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade100),
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary.withOpacity(0.08),
+                          theme.colorScheme.primary.withOpacity(0.02),
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.smart_toy_outlined,
+                            color: theme.colorScheme.primary,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'چت با مزومو AI',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'دستیار هوشمند مبتنی بر اسناد',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: Colors.grey.shade300,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
           SliverToBoxAdapter(
             child: Padding(

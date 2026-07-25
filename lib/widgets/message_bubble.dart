@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../model/message.dart';
 
+final _rtlScriptPattern = RegExp(r'[֐-׿؀-ۿ܀-ࣿיִ-﷿ﹰ-﻿]');
+
+TextDirection _detectTextDirection(String text) {
+  return _rtlScriptPattern.hasMatch(text) ? TextDirection.rtl : TextDirection.ltr;
+}
+
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
@@ -90,6 +96,7 @@ class MessageBubble extends StatelessWidget {
                     ),
                   Text(
                     message.text,
+                    textDirection: _detectTextDirection(message.text),
                     style: TextStyle(
                       fontSize: 15,
                       color: isMe ? Colors.white : Colors.black87,
