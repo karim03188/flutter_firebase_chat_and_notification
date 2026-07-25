@@ -1,3 +1,2 @@
-const chatRoom = "room1";
-const currentUser = "user1";
+const djangoBaseUrl = "http://10.0.2.2:8000/api";
 

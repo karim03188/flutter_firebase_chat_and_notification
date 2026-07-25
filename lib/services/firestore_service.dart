@@ -1,20 +1,25 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
-import '../constants.dart';
 import '../model/message.dart';
 
 class FirestoreService {
-  final DatabaseReference _messagesRef = FirebaseDatabase.instance.ref(chatRoom);
+  late DatabaseReference _messagesRef;
+  String? _currentRoomId;
+
+  void setRoom(String roomId) {
+    _currentRoomId = roomId;
+    _messagesRef = FirebaseDatabase.instance.ref('rooms/$roomId/messages');
+  }
+
+  String? get currentRoomId => _currentRoomId;
 
   Future<void> sendMessage(String text) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || text.trim().isEmpty) {
+    if (user == null || text.trim().isEmpty || _currentRoomId == null) {
       return;
     }
 
-    // Push message to database
-    // The Cloud Function will detect this and send FCM to other users
     await _messagesRef.push().set({
       'sender': user.email ?? 'unknown',
       'text': text.trim(),
@@ -23,6 +28,10 @@ class FirestoreService {
   }
 
   Stream<List<Message>> getMessages() {
+    if (_currentRoomId == null) {
+      return Stream.value([]);
+    }
+
     return _messagesRef.orderByChild('time').onValue.map((event) {
       final data = event.snapshot.value;
       if (data is! Map) {
