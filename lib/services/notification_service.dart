@@ -173,6 +173,5 @@ class NotificationService {
     }
 
     await FirebaseDatabase.instance.ref('fcm_tokens/${user.uid}').remove();
-    ApiService.logout();
   }
 }

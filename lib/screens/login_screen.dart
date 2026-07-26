@@ -1,8 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -75,13 +76,35 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           password: _passwordController.text.trim(),
         );
       }
-      await ApiService.login(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
+      // Django authenticates via the same Firebase ID token on each API call —
+      // no separate backend login step needed.
     } on FirebaseAuthException catch (error) {
       if (mounted) {
         setState(() => _errorMessage = error.message ?? 'Authentication failed');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Firebase resolves sign-up vs. sign-in automatically here: a new
+      // Google account creates a Firebase user, an existing one (whether
+      // created via Google or via email/password) just signs in.
+      await AuthService.signInWithGoogle();
+    } on GoogleSignInException catch (error) {
+      if (mounted && error.code != GoogleSignInExceptionCode.canceled) {
+        setState(() => _errorMessage = error.description ?? 'Google sign-in failed');
+      }
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        setState(() => _errorMessage = error.message ?? 'Google sign-in failed');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -330,6 +353,41 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'or',
+                              style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _signInWithGoogle,
+                          icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                          label: const Text(
+                            'Continue with Google',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.black87,
+                            backgroundColor: Colors.white,
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

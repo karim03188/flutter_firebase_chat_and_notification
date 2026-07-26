@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import 'chat_screen.dart';
 import 'muzzomo_ai_chat_screen.dart';
@@ -73,7 +74,114 @@ class _RoomsScreenState extends State<RoomsScreen> {
 
   Future<void> _signOut() async {
     await NotificationService().deleteTokenFromDatabase();
-    await FirebaseAuth.instance.signOut();
+    await AuthService.signOut();
+  }
+
+  Future<void> _showAddPasswordSheet() async {
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    String? errorText;
+    bool isSaving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Add a password',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Your account currently only signs in with Google. '
+                    'Add a password so you can also sign in with email/password.',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      hintText: 'New password',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Confirm password',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorText!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              final password = passwordController.text;
+                              if (password.length < 6) {
+                                setSheetState(() => errorText = 'At least 6 characters');
+                                return;
+                              }
+                              if (password != confirmController.text) {
+                                setSheetState(() => errorText = 'Passwords do not match');
+                                return;
+                              }
+
+                              setSheetState(() {
+                                isSaving = true;
+                                errorText = null;
+                              });
+
+                              try {
+                                await AuthService.addPassword(password);
+                                if (context.mounted) Navigator.pop(context);
+                              } on FirebaseAuthException catch (e) {
+                                setSheetState(() {
+                                  isSaving = false;
+                                  errorText = e.message ?? 'Failed to add password';
+                                });
+                              }
+                            },
+                      child: isSaving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _showCreateRoomSheet() async {
@@ -368,6 +476,12 @@ class _RoomsScreenState extends State<RoomsScreen> {
               ),
             ),
             actions: [
+              if (!AuthService.hasPasswordProvider)
+                IconButton(
+                  onPressed: _showAddPasswordSheet,
+                  icon: const Icon(Icons.password),
+                  tooltip: 'Add password',
+                ),
               IconButton(
                 onPressed: _signOut,
                 icon: const Icon(Icons.logout),

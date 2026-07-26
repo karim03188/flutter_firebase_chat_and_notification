@@ -6,56 +6,14 @@ import 'package:http/http.dart' as http;
 import '../constants.dart';
 
 class ApiService {
-  static String? _accessToken;
-  static String? _refreshToken;
+  static bool get isAuthenticated => FirebaseAuth.instance.currentUser != null;
 
-  static bool get isAuthenticated => _accessToken != null;
-
-  static Future<void> login(String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$djangoBaseUrl/token/'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      _accessToken = data['access'];
-      _refreshToken = data['refresh'];
-    } else if (response.statusCode == 401) {
-      await _register(email, password);
-    } else {
-      throw Exception('Failed to authenticate with backend');
-    }
-  }
-
-  static Future<void> _register(String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$djangoBaseUrl/register/'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
-    );
-
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      await login(email, password);
-    } else {
-      throw Exception('Failed to register with backend');
-    }
-  }
-
-  static Future<void> refreshAccessToken() async {
-    if (_refreshToken == null) return;
-
-    final response = await http.post(
-      Uri.parse('$djangoBaseUrl/token/refresh/'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refresh': _refreshToken}),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      _accessToken = data['access'];
-    }
+  /// Firebase is the single source of truth for auth — Django verifies the
+  /// same Firebase ID token on every request instead of issuing its own JWT.
+  /// `getIdToken()` returns the cached token and transparently refreshes it
+  /// when it's close to expiry, so callers never need to manage it manually.
+  static Future<String?> _idToken() async {
+    return FirebaseAuth.instance.currentUser?.getIdToken();
   }
 
   static Future<http.Response> _authenticatedRequest(
@@ -63,44 +21,23 @@ class ApiService {
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
-    if (_accessToken == null) throw Exception('Not authenticated');
+    final token = await _idToken();
+    if (token == null) throw Exception('Not authenticated');
 
     final uri = Uri.parse('$djangoBaseUrl$endpoint');
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $_accessToken',
+      'Authorization': 'Bearer $token',
     };
-
-    http.Response response;
 
     switch (method) {
       case 'POST':
-        response = await http.post(uri, headers: headers, body: jsonEncode(body));
-        break;
+        return http.post(uri, headers: headers, body: jsonEncode(body));
       case 'DELETE':
-        response = await http.delete(uri, headers: headers);
-        break;
+        return http.delete(uri, headers: headers);
       default:
-        response = await http.get(uri, headers: headers);
+        return http.get(uri, headers: headers);
     }
-
-    if (response.statusCode == 401) {
-      await refreshAccessToken();
-      headers['Authorization'] = 'Bearer $_accessToken';
-
-      switch (method) {
-        case 'POST':
-          response = await http.post(uri, headers: headers, body: jsonEncode(body));
-          break;
-        case 'DELETE':
-          response = await http.delete(uri, headers: headers);
-          break;
-        default:
-          response = await http.get(uri, headers: headers);
-      }
-    }
-
-    return response;
   }
 
   static Future<void> registerDevice(String deviceToken, String platform) async {
@@ -189,7 +126,7 @@ class ApiService {
     }
   }
 
-  /// Muzzomo AI chat is open to unauthenticated use — no Django JWT required.
+  /// Muzzomo AI chat is open to unauthenticated use — no auth token required.
   static Future<Map<String, dynamic>?> askMuzzomoAi({
     required String question,
     int? conversationId,
@@ -240,10 +177,5 @@ class ApiService {
     } catch (e) {
       print('Error sending chat notification: $e');
     }
-  }
-
-  static void logout() {
-    _accessToken = null;
-    _refreshToken = null;
   }
 }
