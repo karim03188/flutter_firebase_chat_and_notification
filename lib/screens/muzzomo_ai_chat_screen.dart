@@ -7,12 +7,6 @@ import '../widgets/message_bubble.dart';
 
 const _muzzomoSenderName = 'Muzzomo AI';
 
-final _rtlScriptPattern = RegExp(r'[֐-׿؀-ۿ܀-ࣿיִ-﷿ﹰ-﻿]');
-
-TextDirection _detectTextDirection(String text) {
-  return _rtlScriptPattern.hasMatch(text) ? TextDirection.rtl : TextDirection.ltr;
-}
-
 class MuzzomoAiChatScreen extends StatefulWidget {
   const MuzzomoAiChatScreen({super.key});
 
@@ -27,24 +21,9 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
 
   int? _conversationId;
   bool _isSending = false;
-  TextDirection _inputDirection = TextDirection.rtl;
-
-  @override
-  void initState() {
-    super.initState();
-    _messageController.addListener(_onInputChanged);
-  }
-
-  void _onInputChanged() {
-    final direction = _detectTextDirection(_messageController.text);
-    if (direction != _inputDirection) {
-      setState(() => _inputDirection = direction);
-    }
-  }
 
   @override
   void dispose() {
-    _messageController.removeListener(_onInputChanged);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -85,7 +64,7 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
       setState(() {
         _messages.add(Message(
           sender: _muzzomoSenderName,
-          text: 'مشکلی در دریافت پاسخ پیش آمد. دوباره تلاش کنید.',
+          text: 'Something went wrong getting a response. Please try again.',
           time: DateTime.now(),
         ));
         _isSending = false;
@@ -105,7 +84,7 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
     setState(() {
       _messages.add(Message(
         sender: _muzzomoSenderName,
-        text: answer.isEmpty ? 'پاسخی دریافت نشد.' : answer,
+        text: answer.isEmpty ? 'No response received.' : answer,
         time: DateTime.now(),
       ));
       _isSending = false;
@@ -128,11 +107,11 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'چت با مزومو AI',
+              'Chat with Muzzomo AI',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             ),
             Text(
-              'دستیار هوشمند مبتنی بر اسناد',
+              'Document-grounded AI assistant',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
             ),
           ],
@@ -149,7 +128,7 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
                         Icon(Icons.smart_toy_outlined, size: 64, color: Colors.grey.shade200),
                         const SizedBox(height: 16),
                         Text(
-                          'از مزومو AI بپرس',
+                          'Ask Muzzomo AI',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
@@ -158,7 +137,7 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'پاسخ‌ها بر اساس اسناد آموزش‌دیده است',
+                          'Answers are grounded in the trained documents',
                           style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
                         ),
                       ],
@@ -180,7 +159,7 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               ),
                               SizedBox(width: 12),
-                              Text('مزومو در حال نوشتن پاسخ است...'),
+                              Text('Muzzomo is typing a response...'),
                             ],
                           ),
                         );
@@ -223,14 +202,16 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
                         controller: _messageController,
                         textCapitalization: TextCapitalization.sentences,
                         enabled: !_isSending,
-                        textDirection: _inputDirection,
-                        textAlign: _inputDirection == TextDirection.rtl
-                            ? TextAlign.right
-                            : TextAlign.left,
+                        // No explicit textDirection here: Flutter's text
+                        // layout already auto-detects per-paragraph bidi
+                        // direction from the Unicode bidi algorithm. Forcing
+                        // textDirection via setState on every keystroke was
+                        // resetting the IME composing region and made
+                        // Persian/Arabic characters vanish while typing.
+                        textAlign: TextAlign.start,
                         decoration: InputDecoration(
-                          hintText: 'سوال خود را بپرسید...',
+                          hintText: 'Ask a question in any language...',
                           hintStyle: TextStyle(color: Colors.grey.shade400),
-                          hintTextDirection: TextDirection.rtl,
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 20,

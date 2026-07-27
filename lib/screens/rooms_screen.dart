@@ -532,7 +532,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'چت با مزومو AI',
+                                'Chat with Muzzomo AI',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -540,7 +540,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'دستیار هوشمند مبتنی بر اسناد',
+                                'Document-grounded AI assistant',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey.shade500,
