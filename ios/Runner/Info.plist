@@ -70,5 +70,9 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Muzzomo AI uses your camera so you can take and share a photo directly in chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Muzzomo AI uses your photo library so you can attach an existing photo in chat.</string>
 </dict>
 </plist>

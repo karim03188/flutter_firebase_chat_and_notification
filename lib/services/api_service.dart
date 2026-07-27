@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -126,20 +127,45 @@ class ApiService {
     }
   }
 
-  /// Muzzomo AI chat is open to unauthenticated use — no auth token required.
+  /// Muzzomo AI chat is open to unauthenticated use, but attaches the
+  /// Firebase token when available so the assistant can use account tools
+  /// (chat rooms, notification preferences) for signed-in users.
   static Future<Map<String, dynamic>?> askMuzzomoAi({
     required String question,
     int? conversationId,
+    File? image,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$djangoBaseUrl/muzzomo-ai/ask/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'question': question,
-          'conversation_id': conversationId,
-        }),
-      );
+      final uri = Uri.parse('$djangoBaseUrl/muzzomo-ai/ask/');
+      final token = await _idToken();
+
+      http.Response response;
+      if (image != null) {
+        final request = http.MultipartRequest('POST', uri);
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+        request.fields['question'] = question;
+        if (conversationId != null) {
+          request.fields['conversation_id'] = conversationId.toString();
+        }
+        request.files.add(await http.MultipartFile.fromPath('image', image.path));
+        response = await http.Response.fromStream(await request.send());
+      } else {
+        final headers = {'Content-Type': 'application/json'};
+        if (token != null) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+        response = await http.post(
+          uri,
+          headers: headers,
+          body: jsonEncode({
+            'question': question,
+            'conversation_id': conversationId,
+          }),
+        );
+      }
+
       if (response.statusCode == 201) {
         return jsonDecode(response.body);
       }

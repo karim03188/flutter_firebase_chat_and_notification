@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../model/message.dart';
 import '../services/api_service.dart';
 import '../widgets/message_bubble.dart';
+import 'rooms_screen.dart';
 
 const _muzzomoSenderName = 'Muzzomo AI';
 
@@ -18,15 +22,75 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final List<Message> _messages = [];
+  final _imagePicker = ImagePicker();
 
   int? _conversationId;
   bool _isSending = false;
+  File? _pendingImage;
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    if (!mounted) return;
+    setState(() => _pendingImage = File(picked.path));
+  }
+
+  void _handleAction(MessageAction action) {
+    switch (action.id) {
+      case 'open_rooms':
+      case 'open_create_room':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const RoomsScreen()),
+        );
+        break;
+      case 'open_users':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const RoomsScreen()),
+        );
+        break;
+      case 'open_notification_preferences':
+        // No dedicated preferences screen yet — surface where it will live.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notification preferences screen coming soon.')),
+        );
+        break;
+    }
   }
 
   void _scrollToBottom() {
@@ -42,20 +106,28 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _isSending) return;
+    if ((text.isEmpty && _pendingImage == null) || _isSending) return;
 
     final currentEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+    final imageToSend = _pendingImage;
 
     setState(() {
-      _messages.add(Message(sender: currentEmail, text: text, time: DateTime.now()));
+      _messages.add(Message(
+        sender: currentEmail,
+        text: text,
+        time: DateTime.now(),
+        imagePath: imageToSend?.path,
+      ));
       _isSending = true;
       _messageController.clear();
+      _pendingImage = null;
     });
     _scrollToBottom();
 
     final result = await ApiService.askMuzzomoAi(
-      question: text,
+      question: text.isEmpty ? 'What do you see in this image?' : text,
       conversationId: _conversationId,
+      image: imageToSend,
     );
 
     if (!mounted) return;
@@ -80,12 +152,14 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
       orElse: () => const {},
     );
     final answer = lastAssistantMessage['content'] as String? ?? '';
+    final actionJson = lastAssistantMessage['action'] as Map<String, dynamic>?;
 
     setState(() {
       _messages.add(Message(
         sender: _muzzomoSenderName,
         text: answer.isEmpty ? 'No response received.' : answer,
         time: DateTime.now(),
+        action: actionJson == null ? null : MessageAction.fromJson(actionJson),
       ));
       _isSending = false;
     });
@@ -171,6 +245,7 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
                       return MessageBubble(
                         message: message,
                         isMe: isMe,
+                        onActionTap: _handleAction,
                       );
                     },
                   ),
@@ -189,8 +264,44 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
             ),
             child: SafeArea(
               top: false,
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_pendingImage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(_pendingImage!, width: 64, height: 64, fit: BoxFit.cover),
+                          ),
+                          Positioned(
+                            top: -8,
+                            right: -8,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _pendingImage = null),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(2),
+                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Row(
+                children: [
+                  IconButton(
+                    onPressed: _isSending ? null : _pickImage,
+                    icon: Icon(Icons.image_outlined, color: Colors.grey.shade600),
+                  ),
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
@@ -234,6 +345,8 @@ class _MuzzomoAiChatScreenState extends State<MuzzomoAiChatScreen> {
                       onPressed: _isSending ? null : _sendMessage,
                       icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                     ),
+                  ),
+                ],
                   ),
                 ],
               ),
